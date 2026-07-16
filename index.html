@@ -316,6 +316,11 @@
         function toggleBase(el) { el.classList.toggle('occupied'); }
         function toggleOut(el) { el.classList.toggle('active'); }
 
+        function resetBasesAndOuts() {
+            document.querySelectorAll('.base').forEach(base => base.classList.remove('occupied'));
+            document.querySelectorAll('.out-dot').forEach(out => out.classList.remove('active'));
+        }
+
         function setCount(type, count) {
             const dots = Array.from(document.querySelectorAll(`.count-dot[data-type="${type}"]`));
             dots.forEach((d, i) => {
@@ -460,6 +465,7 @@
                     idxHome = (idxHome + 1) % lineupHome.length;
                 }
             }
+            resetBasesAndOuts();
             updateInningTeamHighlight();
             updateBatterDisplay();
         }
