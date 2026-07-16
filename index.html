@@ -281,8 +281,11 @@
             try {
                 const data = await window.electronAPI.readLineup();
                 const parsed = parseLineupData(data || '');
-                if (parsed.away.length) lineupAway = parsed.away;
-                if (parsed.home.length) lineupHome = parsed.home;
+                lineupAway = parsed.away || [];
+                lineupHome = parsed.home || [];
+
+                if (idxAway >= lineupAway.length) idxAway = 0;
+                if (idxHome >= lineupHome.length) idxHome = 0;
             } catch (e) {
                 // ignore
             }
@@ -549,8 +552,6 @@
                 }).catch(() => {
                     if (batterEl) batterEl.textContent = 'Error loading lineup';
                 });
-                // start watching for external changes to line-up.txt
-                if (window.electronAPI?.watchLineup) window.electronAPI.watchLineup();
                 if (window.electronAPI?.onLineupChanged) {
                     window.electronAPI.onLineupChanged((data) => {
                         try {
@@ -563,6 +564,8 @@
                         } catch (e) { /* ignore parse errors */ }
                     });
                 }
+                // start watching for external changes to line-up.txt
+                if (window.electronAPI?.watchLineup) window.electronAPI.watchLineup();
             }
         });
   </script>

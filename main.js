@@ -43,10 +43,25 @@ ipcMain.on('resize-window', (event, { width, height }) => {
   if (win) win.setContentSize(width, height);
 });
 
+function resolveLineupPath() {
+  const candidates = [
+    path.resolve(__dirname, 'line-up.txt'),
+    path.join(app.getAppPath(), 'line-up.txt'),
+    path.join(process.cwd(), 'line-up.txt')
+  ];
+
+  return candidates.find(candidate => {
+    try {
+      return require('fs').existsSync(candidate);
+    } catch (e) {
+      return false;
+    }
+  }) || candidates[0];
+}
+
 ipcMain.handle('read-lineup', async (event) => {
   const fs = require('fs').promises;
-  const appPath = app.getAppPath();
-  const filePath = path.join(appPath, 'line-up.txt');
+  const filePath = resolveLineupPath();
   try {
     const data = await fs.readFile(filePath, 'utf8');
     return data;
@@ -58,25 +73,24 @@ ipcMain.handle('read-lineup', async (event) => {
 // Watch the line-up file and push updates to renderer
 ipcMain.on('watch-lineup', (event) => {
   const fs = require('fs');
-  const appPath = app.getAppPath();
-  const filePath = path.join(appPath, 'line-up.txt');
+  const filePath = resolveLineupPath();
   const sender = event.sender;
-  // send initial contents
-  fs.promises.readFile(filePath, 'utf8').then(data => {
-    sender.send('lineup-changed', data);
-  }).catch(() => {
-    sender.send('lineup-changed', '');
-  });
-  // watch for changes
+
+  const sendFileContent = async () => {
+    try {
+      const data = await fs.promises.readFile(filePath, 'utf8');
+      sender.send('lineup-changed', data);
+    } catch (e) {
+      sender.send('lineup-changed', '');
+    }
+  };
+
+  sendFileContent();
+
   try {
-    fs.watchFile(filePath, { interval: 500 }, async (curr, prev) => {
-      if (curr.mtimeMs <= prev.mtimeMs) return;
-      try {
-        const data = await fs.promises.readFile(filePath, 'utf8');
-        sender.send('lineup-changed', data);
-      } catch (e) {
-        sender.send('lineup-changed', '');
-      }
+    fs.watch(filePath, (eventType) => {
+      if (eventType !== 'change') return;
+      sendFileContent();
     });
   } catch (e) {
     // ignore watch errors
