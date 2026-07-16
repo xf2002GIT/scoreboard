@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="es"><head><script src="/_sdk/telemetry_sdk.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baseball Scoreboard</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
+  <style>
+        body { font-family: 'DM Sans', sans-serif; }
+        .base {
+            width: 14px; height: 14px;
+            transform: rotate(45deg);
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .base.occupied { background: #facc15; border-color: #facc15; }
+        .out-dot {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .out-dot.active { background: #ef4444; border-color: #ef4444; }
+        .count-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .count-dot.ball-active { background: #227cc5; border-color: #227cc5; }
+        .count-dot.strike-active { background: #ef7a44; border-color: #ef7a44; }
+        .score-num { cursor: pointer; user-select: none; min-width: 2ch; text-align: center; }
+        .inning-num { cursor: pointer; user-select: none; }
+        .inning-toggle {
+            width: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        .inning-toggle div {
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            opacity: 0.35;
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+        .inning-toggle .triangle-up {
+            border-bottom: 8px solid #fff;
+        }
+        .inning-toggle .triangle-down {
+            border-top: 8px solid #fff;
+        }
+        .inning-toggle .active {
+            opacity: 1;
+        }
+        .inning-toggle .active-up {
+            border-bottom-color: #facc15;
+        }
+        .inning-toggle .active-down {
+            border-top-color: #facc15;
+        }
+    </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/resizing_sdk.js" type="text/javascript"></script>
+ </head>
+ <body
+    data-template-id="__page-root"
+    class="w-full min-h-screen flex items-start justify-start"
+    style="background:transparent;">
+
+    <div data-template-id="scoreboard-panel"
+         class="canva-panel rounded-xl p-2.5 flex flex-col gap-1 shadow-2xl"
+         style="backdrop-filter: blur(12px); background: rgba(0,0,0,0.75);">
+
+        <!-- FILA PRINCIPAL -->
+        <div class="flex gap-2.5 items-center">
+
+            <!-- Teams & Score -->
+            <div class="flex flex-col gap-0.1">
+                <div class="flex items-center gap-2">
+                    <span data-template-id="team-away"
+                          class="canva-text text-sm font-bold uppercase tracking-wide"
+                          style="min-width:80px;color:#fff;font-size:13px;"
+                          onclick="makeEditable(this)">
+                        VISITANTE
+                    </span>
+
+                    <span data-template-id="score-away"
+                          class="canva-text text-2xl font-black score-num"
+                          style="color:#fff;font-size:28px;"
+                          onclick="changeScore(this,event)">
+                        0
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <span data-template-id="team-home"
+                          class="canva-text text-sm font-bold uppercase tracking-wide"
+                          style="min-width:80px;color:#fff;font-size:13px;"
+                          onclick="makeEditable(this)">
+                        LOCAL
+                    </span>
+
+                    <span data-template-id="score-home"
+                          class="canva-text text-2xl font-black score-num"
+                          style="color:#fff;font-size:28px;"
+                          onclick="changeScore(this,event)">
+                        0
+                    </span>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="w-px h-9 bg-white/20"></div>
+
+            <!-- Inning -->
+            <div class="flex flex-col items-center gap-0.5">
+                <div class="flex items-center gap-1.5">
+                    <button
+                        onclick="toggleHalfInning()"
+                        class="p-0.5 hover:bg-white/10 rounded transition"
+                        style="background:none;border:none;cursor:pointer;color:#fff;"
+                        aria-label="Cambiar parte del inning">
+
+                        <div id="inning-toggle" class="inning-toggle">
+                            <div class="triangle-up active active-up"></div>
+                            <div class="triangle-down"></div>
+                        </div>
+                    </button>
+
+                    <span data-template-id="inning-number"
+                          class="canva-text text-xl font-black inning-num"
+                          style="color:#fff;font-size:22px;"
+                          onclick="changeInning(this)">
+                        1
+                    </span>
+                </div>
+
+                <span data-template-id="inning-half"
+                      class="canva-text text-[10px] uppercase tracking-widest opacity-70"
+                      style="color:#fff; display:none;">
+                    ALTA
+                </span>
+            </div>
+
+            <!-- Divider -->
+            <div class="w-px h-14 bg-white/20"></div>
+
+            <!-- Bases + Outs -->
+            <div class="flex flex-col items-center gap-0.75">
+
+                <div class="relative" style="width:50px;height:50px;">
+                    <div class="base absolute"
+                         style="top:0;left:50%;margin-left:-7px;margin-top:7px;"
+                         id="base-2"
+                         onclick="toggleBase(this)">
+                    </div>
+
+                    <div class="base absolute"
+                         style="top:50%;left:4px;margin-top:-4px;"
+                         id="base-3"
+                         onclick="toggleBase(this)">
+                    </div>
+
+                    <div class="base absolute"
+                         style="top:50%;right:4px;margin-top:-4px;"
+                         id="base-1"
+                         onclick="toggleBase(this)">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <div class="out-dot" onclick="toggleOut(this)"></div>
+                    <div class="out-dot" onclick="toggleOut(this)"></div>
+                </div>
+
+            </div>
+
+            <!-- Divider -->
+            <div class="w-px h-14 bg-white/20"></div>
+
+            <!-- Count -->
+            <div class="flex flex-col gap-0.75">
+
+                <div class="flex items-center gap-1.5">
+                    <span data-template-id="batter-name"
+                          class="text-sm font-bold text-white"
+                          onclick="makeEditable(this)">
+                        4- Filomena
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] uppercase tracking-wider opacity-70 mr-1 text-white">
+                        B
+                    </span>
+                    <!-- Ball-1 -->
+                    <div class="count-dot" data-type="ball" onclick="toggleCount(this)"></div>
+                    <!-- Ball-2 -->
+                    <div class="count-dot" data-type="ball" onclick="toggleCount(this)"></div>
+                    <!-- Ball-3 -->
+                    <div class="count-dot" data-type="ball" onclick="toggleCount(this)"></div>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] uppercase tracking-wider opacity-70 mr-1 text-white">
+                        S
+                    </span>
+
+                    <!-- Strike-1 -->
+                    <div class="count-dot" data-type="strike" onclick="toggleCount(this)"></div>
+                    <!-- Strike-2 -->
+                    <div class="count-dot" data-type="strike" onclick="toggleCount(this)"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- PITCHER INFO (AHORA DENTRO DEL PANEL) -->
+        <div class="border-t border-white/20 pt-0.75 mt-0.25 text-center">
+
+            <span class="text-[10px] uppercase tracking-widest opacity-70 text-white mr-2">
+                Pitcher
+            </span>
+
+            <span data-template-id="pitcher-name"
+                  class="text-sm font-bold text-white"
+                  onclick="makeEditable(this)">
+                Juan Perez
+            </span>
+
+            <span class="mx-3 text-white/40">|</span>
+
+            <span class="text-[10px] uppercase tracking-widest opacity-70 text-white mr-2">
+                P:
+            </span>
+
+            <span data-template-id="pitch-count"
+                  class="text-sm font-black text-yellow-400"
+                  onclick="changeScore(this,event)">
+                0
+            </span>
+
+        </div>
+
+    </div>
+
+  <script src="/_sdk/editing_sdk.js"></script>
+  <script>
+        let isTopHalf = true;
+        let countProgress = { ball: 0, strike: 0 };
+
+        function updateInningTeamHighlight() {
+            const awayEl = document.querySelector('[data-template-id="team-away"]');
+            const homeEl = document.querySelector('[data-template-id="team-home"]');
+
+            if (awayEl && homeEl) {
+                awayEl.style.color = isTopHalf ? '#facc15' : '#fff';
+                homeEl.style.color = isTopHalf ? '#fff' : '#facc15';
+            }
+        }
+        
+        function toggleBase(el) { el.classList.toggle('occupied'); }
+        function toggleOut(el) { el.classList.toggle('active'); }
+        function toggleCount(el) {
+            const type = el.dataset.type;
+            el.classList.toggle(type === 'ball' ? 'ball-active' : 'strike-active');
+        }
+        function changeScore(el, e) {
+            const delta = e && e.shiftKey ? -1 : 1;
+            let v = parseInt(el.textContent) || 0;
+            el.textContent = Math.max(0, v + delta);
+        }
+        function changeInning(el) {
+            let v = parseInt(el.textContent) || 1;
+            el.textContent = v >= 9 ? 1 : v + 1;
+        }
+        function updatePitchCount() {
+            const pitchEl = document.querySelector('[data-template-id="pitch-count"]');
+            if (pitchEl) {
+                changeScore(pitchEl, {});
+            }
+        }
+        function toggleCountByKeyboard(type) {
+            const dots = Array.from(document.querySelectorAll(`.count-dot[data-type="${type}"]`));
+            if (!dots.length) return;
+
+            const index = countProgress[type] % dots.length;
+            const target = dots[index];
+            toggleCount(target);
+            countProgress[type] = (index + 1) % dots.length;
+
+            if (type === 'ball' || type === 'strike') {
+                updatePitchCount();
+            }
+        }
+        function handleKeyboardShortcuts(e) {
+            const target = e.target;
+            const isTyping = target && (
+                target.isContentEditable ||
+                ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+            );
+
+            if (isTyping) return;
+
+            const key = e.key.toLowerCase();
+            if (key === 'b') {
+                e.preventDefault();
+                toggleCountByKeyboard('ball');
+            } else if (key === 's') {
+                e.preventDefault();
+                toggleCountByKeyboard('strike');
+            } else if (key === 'f') {
+                e.preventDefault();
+                updatePitchCount();
+            } else if (key === '0') {
+                e.preventDefault();
+                const pitchEl = document.querySelector('[data-template-id="pitch-count"]');
+                if (pitchEl) {
+                    pitchEl.textContent = '0';
+                }
+            } else if (key === 'c') {
+                e.preventDefault();
+                document.querySelectorAll('.count-dot').forEach(dot => {
+                    dot.classList.remove('ball-active', 'strike-active');
+                });
+                countProgress = { ball: 0, strike: 0 };
+            }
+        }
+        function toggleHalfInning() {
+            isTopHalf = !isTopHalf;
+            const halfEl = document.querySelector('[data-template-id="inning-half"]');
+            const toggleEl = document.getElementById('inning-toggle');
+            if (halfEl) {
+                halfEl.textContent = isTopHalf ? 'ALTA' : 'BAJA';
+            }
+            if (toggleEl) {
+                const up = toggleEl.querySelector('.triangle-up');
+                const down = toggleEl.querySelector('.triangle-down');
+                if (up && down) {
+                    up.classList.toggle('active', isTopHalf);
+                    up.classList.toggle('active-up', isTopHalf);
+                    down.classList.toggle('active', !isTopHalf);
+                    down.classList.toggle('active-down', !isTopHalf);
+                }
+            }
+            updateInningTeamHighlight();
+        }
+        function makeEditable(el) {
+        el.contentEditable = true;
+        el.focus();
+            function finishEdit() {
+                el.contentEditable = false;
+                el.textContent = el.textContent.trim().toUpperCase();
+                el.removeEventListener('blur', finishEdit);
+            }
+        el.addEventListener('blur', finishEdit);
+        }
+        
+        document.addEventListener('keydown', handleKeyboardShortcuts);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+            updateInningTeamHighlight();
+        });
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0ddb78677c5f197',t:'MTc4MTgyMTU5OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body></html>

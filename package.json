@@ -1,0 +1,20 @@
+{
+  "name": "scoreboard",
+  "version": "1.0.0",
+  "description": "Baseball scoreboard desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^26.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.scoreboard.baseball",
+    "win": {
+      "target": "portable"
+    }
+  }
+}

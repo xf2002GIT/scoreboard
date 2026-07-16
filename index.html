@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baseball Scoreboard</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+        html, body {
+            font-family: 'DM Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            width: max-content;
+            overflow: hidden;
+        }
+        .base {
+            width: 14px; height: 14px;
+            transform: rotate(45deg);
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .base.occupied { background: #facc15; border-color: #facc15; }
+        .out-dot {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .out-dot.active { background: #ef4444; border-color: #ef4444; }
+        .count-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .count-dot.ball-active { background: #22c55e; border-color: #22c55e; }
+        .count-dot.strike-active { background: #ef4444; border-color: #ef4444; }
+        .score-num { cursor: pointer; user-select: none; min-width: 2ch; text-align: center; }
+        .inning-col {
+            width: 3px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.125rem;
+            padding: 0 0.25rem;
+        }
+        .inning-num {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            min-width: 2ch;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .inning-toggle {
+            width: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        .inning-toggle div {
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            opacity: 0.35;
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+        .inning-toggle .triangle-up {
+            border-bottom: 8px solid #fff;
+        }
+        .inning-toggle .triangle-down {
+            border-top: 8px solid #fff;
+        }
+        .inning-toggle .active {
+            opacity: 1;
+        }
+        .inning-toggle .active-up {
+            border-bottom-color: #facc15;
+        }
+        .inning-toggle .active-down {
+            border-top-color: #facc15;
+        }
+        .pitcher-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        button:focus {
+            outline: none;
+        }
+        button:focus-visible {
+            outline: none;
+        }
+        .pitcher-row .editable-name {
+            display: inline;
+            min-height: auto;
+            line-height: 1;
+        }
+        .canva-panel {
+            position: relative;
+            width: max-content;
+            overflow: hidden;
+            -webkit-app-region: drag;
+        }
+        .teams-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            column-gap: 0.75rem;
+            row-gap: 0.25rem;
+            align-items: center;
+        }
+        .scoreboard-row {
+            flex-wrap: nowrap;
+        }
+        .scoreboard-row > * {
+            flex-shrink: 0;
+        }
+        .editable-name {
+            white-space: nowrap;
+            flex-shrink: 0;
+            overflow: hidden;
+            display: inline-block;
+            min-height: 1.25em;
+            min-width: 2ch;
+        }
+        .editable-name:focus {
+            outline: none;
+            overflow: hidden;
+        }
+        [contenteditable="true"] {
+            overflow: hidden !important;
+            resize: none;
+        }
+        .team-name {
+            min-width: 80px;
+        }
+        .no-drag { -webkit-app-region: no-drag; }
+        #closeBtn {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            z-index: 10;
+            border: none;
+            background: transparent;
+            color: rgb(92, 91, 91);
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.7;
+            padding: 2px 6px;
+        }
+        #closeBtn:hover { opacity: 1; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+</head>
+<body data-template-id="__page-root" style="background:transparent;margin:0;">
+    <div data-template-id="scoreboard-panel" class="canva-panel inline-flex flex-col rounded-xl p-5 gap-3 shadow-2xl" style="backdrop-filter: blur(12px); background: rgba(0,0,0,0.75);">
+        <button id="closeBtn" class="no-drag" aria-label="Cerrar">×</button>
+        <div class="scoreboard-row flex gap-6 items-center">
+            <div class="teams-grid flex-shrink-0">
+                <span data-template-id="team-away" class="editable-name team-name canva-text text-sm font-bold uppercase tracking-wide no-drag" style="color:#fff;font-size:13px;" onclick="makeEditable(this)">VISITANTE</span>
+                <span data-template-id="score-away" class="canva-text text-2xl font-black score-num no-drag" style="color:#fff;font-size:28px;" onclick="changeScore(this,event)">0</span>
+                <span data-template-id="team-home" class="editable-name team-name canva-text text-sm font-bold uppercase tracking-wide no-drag" style="color:#fff;font-size:13px;" onclick="makeEditable(this)">LOCAL</span>
+                <span data-template-id="score-home" class="canva-text text-2xl font-black score-num no-drag" style="color:#fff;font-size:28px;" onclick="changeScore(this,event)">0</span>
+            </div>
+            <div class="w-px h-14 bg-white/20"></div>
+            <div class="inning-col">
+                <div class="flex flex-col items-center gap-0.5">
+                    <button onclick="toggleHalfInning()" class="no-drag p-0.5 hover:bg-white/10 rounded transition" style="background:none;border:none;cursor:pointer;color:#fff;" aria-label="Cambiar parte del inning">
+                        <div id="inning-toggle-top" class="inning-toggle">
+                            <div class="triangle-up active active-up"></div>
+                        </div>
+                    </button>
+                    <span data-template-id="inning-number" class="canva-text text-xl font-black inning-num no-drag" style="color:#fff;font-size:22px;" onclick="changeInning(this)">1</span>
+                    <button onclick="toggleHalfInning()" class="no-drag p-0.5 hover:bg-white/10 rounded transition" style="background:none;border:none;cursor:pointer;color:#fff;" aria-label="Cambiar parte del inning">
+                        <div id="inning-toggle-bottom" class="inning-toggle">
+                            <div class="triangle-down"></div>
+                        </div>
+                    </button>
+                </div>
+                <span data-template-id="inning-half" class="canva-text text-[10px] uppercase tracking-widest opacity-70" style="color:#fff; display:none;">ALTA</span>
+            </div>
+            <div class="w-px h-14 bg-white/20"></div>
+            <div class="flex flex-col items-center gap-0.75">
+                <div class="relative" style="width:50px;height:50px;">
+                    <div class="base no-drag absolute" style="top:0;left:50%;margin-left:-7px;margin-top:7px;" id="base-2" onclick="toggleBase(this)"></div>
+                    <div class="base no-drag absolute" style="top:50%;left:4px;margin-top:-4px;" id="base-3" onclick="toggleBase(this)"></div>
+                    <div class="base no-drag absolute" style="top:50%;right:4px;margin-top:-4px;" id="base-1" onclick="toggleBase(this)"></div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <div class="out-dot no-drag" onclick="toggleOut(this)"></div>
+                    <div class="out-dot no-drag" onclick="toggleOut(this)"></div>
+                </div>
+            </div>
+            <div class="w-px h-14 bg-white/20"></div>
+            <div class="flex flex-col gap-2 flex-shrink-0">
+                <div class="flex items-center gap-1.5 flex-nowrap">
+                    <span data-template-id="batter-name" class="editable-name text-sm font-bold text-white no-drag" onclick="makeEditable(this)">4- FILOMENA</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] uppercase tracking-wider opacity-70 mr-1 text-white">B</span>
+                    <div class="count-dot no-drag" data-type="ball" onclick="toggleCount(this)"></div>
+                    <div class="count-dot no-drag" data-type="ball" onclick="toggleCount(this)"></div>
+                    <div class="count-dot no-drag" data-type="ball" onclick="toggleCount(this)"></div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] uppercase tracking-wider opacity-70 mr-1 text-white">S</span>
+                    <div class="count-dot no-drag" data-type="strike" onclick="toggleCount(this)"></div>
+                    <div class="count-dot no-drag" data-type="strike" onclick="toggleCount(this)"></div>
+                </div>
+            </div>
+        </div>
+        <div class="pitcher-row border-t border-white/20 pt-2 mt-1 whitespace-nowrap">
+            <span class="text-[10px] uppercase tracking-widest opacity-70 text-white mr-2">Pitcher</span>
+            <span data-template-id="pitcher-name" class="editable-name text-sm font-bold text-white no-drag" onclick="makeEditable(this)">JUAN PEREZ</span>
+            <span class="mx-3 text-white/40">|</span>
+            <span class="text-[10px] uppercase tracking-widest opacity-70 text-white mr-2">P:</span>
+            <span data-template-id="pitch-count" class="text-sm font-black text-yellow-400 no-drag" onclick="changeScore(this,event)" ondblclick="makeEditable(this)" title="Doble clic para editar">0</span>
+        </div>
+    </div>
+  <script>
+        let isTopHalf = true;
+        let resizeRaf = null;
+        let __lastPanelSize = { width: 0, height: 0 };
+        const __sizeThreshold = 2; // ignore tiny layout jitter under this many pixels
+        let countProgress = { ball: 0, strike: 0 };
+        // Lineup state
+        let lineupAway = []; // visitor
+        let lineupHome = []; // local
+        let idxAway = 0;
+        let idxHome = 0;
+        const nameDefaults = {
+            'team-away': 'VISITANTE',
+            'team-home': 'LOCAL',
+            'batter-name': '4- BATEADOR',
+            'pitcher-name': 'PITCHER'
+        };
+        function updateInningTeamHighlight() {
+            const awayEl = document.querySelector('[data-template-id="team-away"]');
+            const homeEl = document.querySelector('[data-template-id="team-home"]');
+
+            if (awayEl && homeEl) {
+                awayEl.style.color = isTopHalf ? '#facc15' : '#fff';
+                homeEl.style.color = isTopHalf ? '#fff' : '#facc15';
+            }
+        }
+        function parseLineupData(text) {
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            const away = [];
+            const home = [];
+            let mode = null;
+            for (const line of lines) {
+                if (/^\[AWAY\]$/i.test(line)) { mode = 'away'; continue; }
+                if (/^\[HOME\]$/i.test(line)) { mode = 'home'; continue; }
+                if (!mode) {
+                    // if no headers, assume we are in away until a blank separator '---' then home
+                    if (line === '---') { mode = 'home'; continue; }
+                    away.push(line);
+                } else if (mode === 'away') {
+                    away.push(line);
+                } else {
+                    home.push(line);
+                }
+            }
+            return { away, home };
+        }
+
+        async function loadLineup() {
+            if (!window.electronAPI?.readLineup) return;
+            try {
+                const data = await window.electronAPI.readLineup();
+                const parsed = parseLineupData(data || '');
+                if (parsed.away.length) lineupAway = parsed.away;
+                if (parsed.home.length) lineupHome = parsed.home;
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function updateBatterDisplay() {
+            const el = document.querySelector('[data-template-id="batter-name"]');
+            if (!el) return;
+            if (isTopHalf) {
+                if (lineupAway.length) {
+                    el.textContent = lineupAway[idxAway % lineupAway.length];
+                }
+            } else {
+                if (lineupHome.length) {
+                    el.textContent = lineupHome[idxHome % lineupHome.length];
+                }
+            }
+            resizeWindowToPanel();
+        }
+
+        function advanceBatter(delta) {
+            if (isTopHalf) {
+                if (!lineupAway.length) return;
+                idxAway = (idxAway + delta + lineupAway.length) % lineupAway.length;
+            } else {
+                if (!lineupHome.length) return;
+                idxHome = (idxHome + delta + lineupHome.length) % lineupHome.length;
+            }
+            updateBatterDisplay();
+        }
+        function toggleBase(el) { el.classList.toggle('occupied'); }
+        function toggleOut(el) { el.classList.toggle('active'); }
+
+        function setCount(type, count) {
+            const dots = Array.from(document.querySelectorAll(`.count-dot[data-type="${type}"]`));
+            dots.forEach((d, i) => {
+                if (type === 'ball') {
+                    d.classList.toggle('ball-active', i < count);
+                } else {
+                    d.classList.toggle('strike-active', i < count);
+                }
+            });
+            countProgress[type] = count % (dots.length + 1);
+        }
+
+        function toggleCount(el) {
+            const type = el.dataset.type;
+            const dots = Array.from(document.querySelectorAll(`.count-dot[data-type="${type}"]`));
+            if (type === 'ball') {
+                el.classList.toggle('ball-active');
+            } else {
+                el.classList.toggle('strike-active');
+            }
+            const activeCount = dots.filter(d => d.classList.contains(type === 'ball' ? 'ball-active' : 'strike-active')).length;
+            countProgress[type] = activeCount % (dots.length + 1);
+        }
+
+        function changeScore(el, e) {
+            const delta = e && e.shiftKey ? -1 : 1;
+            let v = parseInt(el.textContent) || 0;
+            el.textContent = Math.max(0, v + delta);
+            resizeWindowToPanel();
+        }
+
+        function updatePitchCount() {
+            const pitchEl = document.querySelector('[data-template-id="pitch-count"]');
+            if (pitchEl) {
+                changeScore(pitchEl, {});
+            }
+        }
+
+        function toggleCountByKeyboard(type) {
+            const dots = Array.from(document.querySelectorAll(`.count-dot[data-type="${type}"]`));
+            if (!dots.length) return;
+            const max = dots.length;
+            let current = typeof countProgress[type] === 'number' ? countProgress[type] : dots.filter(d => d.classList.contains(type === 'ball' ? 'ball-active' : 'strike-active')).length;
+            current = (current + 1) % (max + 1);
+            setCount(type, current);
+            if (type === 'ball' || type === 'strike') {
+                updatePitchCount();
+            }
+        }
+
+        function handleKeyboardShortcuts(e) {
+            const target = e.target;
+            const isTyping = target && (
+                target.isContentEditable ||
+                ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+            );
+
+            if (isTyping) return;
+
+            const clearButtonFocus = () => {
+                const active = document.activeElement;
+                if (active && active.tagName === 'BUTTON') {
+                    active.blur();
+                }
+            };
+
+            const key = e.key.toLowerCase();
+            if (key === 'b') {
+                e.preventDefault();
+                toggleCountByKeyboard('ball');
+                clearButtonFocus();
+            } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+                e.preventDefault();
+                advanceBatter(1);
+                clearButtonFocus();
+            } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
+                e.preventDefault();
+                advanceBatter(-1);
+                clearButtonFocus();
+            } else if (key === 's') {
+                e.preventDefault();
+                toggleCountByKeyboard('strike');
+                clearButtonFocus();
+            } else if (key === 'f') {
+                e.preventDefault();
+                updatePitchCount();
+                clearButtonFocus();
+            } else if (key === '0') {
+                e.preventDefault();
+                const pitchEl = document.querySelector('[data-template-id="pitch-count"]');
+                if (pitchEl) {
+                    pitchEl.textContent = '0';
+                }
+                clearButtonFocus();
+            } else if (key === 'c') {
+                e.preventDefault();
+                document.querySelectorAll('.count-dot').forEach(dot => {
+                    dot.classList.remove('ball-active', 'strike-active');
+                });
+                countProgress = { ball: 0, strike: 0 };
+                clearButtonFocus();
+            }
+        }
+
+        function changeInning(el) {
+            let v = parseInt(el.textContent) || 1;
+            el.textContent = v >= 9 ? 1 : v + 1;
+        }
+
+        function toggleHalfInning() {
+            const prevTop = isTopHalf;
+            isTopHalf = !isTopHalf;
+            const halfEl = document.querySelector('[data-template-id="inning-half"]');
+            const top = document.querySelector('#inning-toggle-top .triangle-up');
+            const bottom = document.querySelector('#inning-toggle-bottom .triangle-down');
+            if (halfEl) {
+                halfEl.textContent = isTopHalf ? 'ALTA' : 'BAJA';
+            }
+            if (top && bottom) {
+                top.classList.toggle('active', isTopHalf);
+                top.classList.toggle('active-up', isTopHalf);
+                bottom.classList.toggle('active', !isTopHalf);
+                bottom.classList.toggle('active-down', !isTopHalf);
+            }
+            // Advance batting order according to rules:
+            // - When switching to ALTA (visitor) advance visitor index to next batter (start next inning)
+            // - When switching to BAJA (home) advance home index to next batter
+            if (isTopHalf && !prevTop) {
+                // moved from BAJA -> ALTA: consider this start of next inning
+                // increment inning number displayed
+                const inningEl = document.querySelector('[data-template-id="inning-number"]');
+                if (inningEl) {
+                    let v = parseInt(inningEl.textContent) || 1;
+                    inningEl.textContent = v >= 9 ? 1 : v + 1;
+                }
+                if (lineupAway.length) {
+                    idxAway = (idxAway + 1) % lineupAway.length;
+                }
+            } else if (!isTopHalf && prevTop) {
+                // moved from ALTA -> BAJA
+                if (lineupHome.length) {
+                    idxHome = (idxHome + 1) % lineupHome.length;
+                }
+            }
+            updateInningTeamHighlight();
+            updateBatterDisplay();
+        }
+
+        function makeEditable(el) {
+            el.contentEditable = true;
+            el.focus();
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            function onInput() { resizeWindowToPanel(); }
+            function onKeyDown(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    el.blur();
+                }
+            }
+            function finishEdit() {
+                el.contentEditable = false;
+                const fieldId = el.getAttribute('data-template-id');
+                let text = el.textContent.trim();
+                if (fieldId === 'pitch-count') {
+                    const numeric = parseInt(text, 10);
+                    el.textContent = Number.isFinite(numeric) && numeric >= 0 ? String(numeric) : '0';
+                } else {
+                    text = text.toUpperCase();
+                    if (!text && fieldId && nameDefaults[fieldId]) {
+                        text = nameDefaults[fieldId];
+                    }
+                    el.textContent = text;
+                }
+                el.removeEventListener('blur', finishEdit);
+                el.removeEventListener('input', onInput);
+                el.removeEventListener('keydown', onKeyDown);
+                resizeWindowToPanel();
+            }
+            el.addEventListener('input', onInput);
+            el.addEventListener('keydown', onKeyDown);
+            el.addEventListener('blur', finishEdit);
+        }
+        function resizeWindowToPanel() {
+            if (resizeRaf) cancelAnimationFrame(resizeRaf);
+            resizeRaf = requestAnimationFrame(() => {
+                resizeRaf = null;
+                const panel = document.querySelector('[data-template-id="scoreboard-panel"]');
+                if (!panel || !window.electronAPI?.resizeWindow) return;
+                const width = Math.ceil(panel.scrollWidth);
+                const height = Math.ceil(panel.scrollHeight);
+                if (Math.abs(width - __lastPanelSize.width) < __sizeThreshold && Math.abs(height - __lastPanelSize.height) < __sizeThreshold) return;
+                __lastPanelSize.width = width;
+                __lastPanelSize.height = height;
+                window.electronAPI.resizeWindow(width, height);
+            });
+        }
+        document.addEventListener('keydown', handleKeyboardShortcuts);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) lucide.createIcons();
+            updateInningTeamHighlight();
+            const closeBtn = document.getElementById('closeBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    if (window.electronAPI?.closeWindow) window.electronAPI.closeWindow();
+                });
+            }
+            const panel = document.querySelector('[data-template-id="scoreboard-panel"]');
+            if (panel) {
+                new ResizeObserver(() => resizeWindowToPanel()).observe(panel);
+                resizeWindowToPanel();
+                // show loading indicator and load lineup file
+                const batterEl = document.querySelector('[data-template-id="batter-name"]');
+                if (batterEl) batterEl.textContent = 'Cargando...';
+                loadLineup().then(() => {
+                    if ((isTopHalf && lineupAway.length) || (!isTopHalf && lineupHome.length)) {
+                        updateBatterDisplay();
+                    } else if (batterEl) {
+                        batterEl.textContent = 'No lineup loaded';
+                    }
+                }).catch(() => {
+                    if (batterEl) batterEl.textContent = 'Error loading lineup';
+                });
+                // start watching for external changes to line-up.txt
+                if (window.electronAPI?.watchLineup) window.electronAPI.watchLineup();
+                if (window.electronAPI?.onLineupChanged) {
+                    window.electronAPI.onLineupChanged((data) => {
+                        try {
+                            const parsed = parseLineupData(data || '');
+                            lineupAway = parsed.away || [];
+                            lineupHome = parsed.home || [];
+                            if (idxAway >= lineupAway.length) idxAway = 0;
+                            if (idxHome >= lineupHome.length) idxHome = 0;
+                            updateBatterDisplay();
+                        } catch (e) { /* ignore parse errors */ }
+                    });
+                }
+            }
+        });
+  </script>
+</body>
+</html>
