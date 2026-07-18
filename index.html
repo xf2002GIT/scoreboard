@@ -327,6 +327,18 @@
 
         function toggleOut(el) { el.classList.toggle('active'); }
 
+        function toggleOutsByKeyboard() {
+            const out1 = document.getElementById('out-1');
+            const out2 = document.getElementById('out-2');
+            if (!out1 || !out2) return;
+
+            if (!out1.classList.contains('active')) {
+                out1.classList.add('active');
+            } else if (!out2.classList.contains('active')) {
+                out2.classList.add('active');
+            }
+        }
+
         function resetBasesAndOuts() {
             document.querySelectorAll('.base').forEach(base => base.classList.remove('occupied'));
             document.querySelectorAll('.out-dot').forEach(out => out.classList.remove('active'));
@@ -430,6 +442,10 @@
             } else if (key === 'f') {
                 e.preventDefault();
                 updatePitchCount();
+                clearButtonFocus();
+            } else if (key === 'x') {
+                e.preventDefault();
+                toggleOutsByKeyboard();
                 clearButtonFocus();
             } else if (key === '0') {
                 e.preventDefault();
