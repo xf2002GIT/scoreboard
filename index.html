@@ -317,6 +317,14 @@
             updateBatterDisplay();
         }
         function toggleBase(el) { el.classList.toggle('occupied'); }
+
+        function toggleBaseByKeyboard(baseId) {
+            const el = document.getElementById(baseId);
+            if (el) {
+                toggleBase(el);
+            }
+        }
+
         function toggleOut(el) { el.classList.toggle('active'); }
 
         function resetBasesAndOuts() {
@@ -391,7 +399,19 @@
             };
 
             const key = e.key.toLowerCase();
-            if (key === 'b') {
+            if (key === '1') {
+                e.preventDefault();
+                toggleBaseByKeyboard('base-1');
+                clearButtonFocus();
+            } else if (key === '2') {
+                e.preventDefault();
+                toggleBaseByKeyboard('base-2');
+                clearButtonFocus();
+            } else if (key === '3') {
+                e.preventDefault();
+                toggleBaseByKeyboard('base-3');
+                clearButtonFocus();
+            } else if (key === 'b') {
                 e.preventDefault();
                 toggleCountByKeyboard('ball');
                 clearButtonFocus();
